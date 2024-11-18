@@ -1,0 +1,67 @@
+#! /bin/sh -eu
+
+MEDIR=`dirname "$0"`
+VENDIR_DIR=vendor
+
+main ()
+{
+    cd "${MEDIR}/.."
+
+    installPackageWithGithubRepositoryAndCommit "${1}" "${2}"
+
+    dumpAutoloadToFile "${VENDIR_DIR}/autoload.vim"
+}
+
+installPackageWithGithubRepositoryAndCommit ()
+{
+    repositoryName=${1}
+    targetCommit=${2}
+
+    installationDirectory="${VENDIR_DIR}/${repositoryName}"
+
+    test -d "$installationDirectory" || {
+        {
+            git clone \
+                --single-branch \
+                "https://github.com/${repositoryName}.git" \
+                "$installationDirectory"
+
+            git \
+                --work-tree="$installationDirectory" \
+                --git-dir="$installationDirectory/.git" \
+                reset --hard \
+                "$targetCommit" --
+        } || {
+            rm -rf "$installationDirectory"
+
+            exit 1
+        }
+    }
+}
+
+dumpAutoloadToFile ()
+{
+    autoloadFile="${1}"
+
+    cat > "${autoloadFile}" <<EOF
+set runtimepath=
+`echoAutoloadForVendor`
+set runtimepath+=.
+EOF
+}
+
+echoAutoloadForVendor ()
+{
+    for directory in `findVendorDirectories`; do
+        cat <<EOF
+set runtimepath+=${directory}
+EOF
+    done
+}
+
+findVendorDirectories ()
+{
+    find "${VENDIR_DIR}" -maxdepth 2 -mindepth 2 -type d
+}
+
+main ${1+"$@"}

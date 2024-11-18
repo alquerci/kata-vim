@@ -1,0 +1,100 @@
+#! /bin/sh -eu
+
+MEDIR=`dirname "$0"`
+
+main ()
+{
+    installDependencies
+
+    if executeTestSuite; then
+        drawBarWithColor green
+
+        return 0
+    else
+        drawBarWithColor red
+
+        return 1
+    fi
+}
+
+installDependencies ()
+{
+    "${MEDIR}/package-add" \
+        'junegunn/vader.vim' \
+        '6fff477431ac3191c69a3a5e5f187925466e275a' \
+    ;
+}
+
+executeTestSuite ()
+{
+    cd "${MEDIR}/.."
+
+    vim -e -s -N \
+        -u 'vendor/autoload.vim' \
+        -c 'filetype off' \
+        -c 'Vader! -x -q '"${1-autoload/**}" \
+    ;
+}
+
+drawBarWithColor ()
+{
+    defineStyle
+
+    case ${1} in #(
+        green)
+            color=${style_green}
+            ;; #(
+        red)
+            color=${style_red}
+            ;; #(
+        *)
+            echo >&2
+            echo >&2 "error: Unsupported color '${1}'. Only 'green' and 'red' color are supported."
+            echo >&2
+
+            return 2
+            ;; #(
+    esac
+
+    columns=`getTerminalColumns`
+    box=`repeatStringFor '█' ${columns}`
+    messageLine="${color}${box}${style_reset}"
+
+    echo
+    repeatLineFor "${messageLine}" 3
+    echo
+}
+
+defineStyle ()
+{
+    style_reset=`tput sgr0 2>/dev/null || echo ''`
+
+    style_green=`getStyleColorById 2`
+    style_red=`getStyleColorById 1`
+}
+
+getStyleColorById ()
+{
+    tput setaf ${1} 2>/dev/null || echo ''
+}
+
+getTerminalColumns ()
+{
+    tput cols || echo 80
+}
+
+repeatStringFor ()
+{
+    seq -s${1} 0 ${2} | sed -e 's,[0-9],,g'
+}
+
+repeatLineFor ()
+{
+    seq 1 ${2} | while read _; do
+        cat <<EOF
+${1}
+EOF
+    done
+}
+
+main ${1+"$@"}

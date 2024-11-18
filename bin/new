@@ -1,0 +1,96 @@
+#! /bin/sh -eu
+
+me=$0
+medir=`dirname "$me"`
+
+displayHelpMessage () {
+    cat >&2 <<EOF
+
+$0 <package_name>
+
+EOF
+}
+
+${1+:} false || {
+    displayHelpMessage
+
+    exit 2
+}
+
+defaultpkgname=acme
+testCodeFileExt=vader
+GIT=git
+SED=sed
+
+pkgdir=`realpath "${medir}/.."`
+srcdir="${pkgdir}/autoload"
+
+main ()
+{
+    pkgname=$1
+
+    createNewBranch
+
+    configureClassName
+
+    removeSkeletonArtefact
+    commit
+
+    echo
+    echo "Open ${srcdir}/${pkgname}/tests/${pkgname}.test.${testCodeFileExt}"
+    echo
+    echo "And start coding"
+    echo
+}
+
+createNewBranch ()
+{
+    checkWorkingTree
+
+    nowday=`date '+%F_%T' | tr : -`
+
+    git checkout -b "${nowday}_${pkgname}"
+}
+
+configureClassName ()
+{
+    mkdir -p "${srcdir}/${pkgname}/tests"
+
+    mv "${srcdir}/${defaultpkgname}/tests/${defaultpkgname}.test.${testCodeFileExt}" \
+       "${srcdir}/${pkgname}/tests/${pkgname}.test.${testCodeFileExt}"
+}
+
+removeSkeletonArtefact ()
+{
+    git rm $me
+}
+
+commit ()
+{
+    git add \
+        "${srcdir}/${pkgname}/tests/${pkgname}.test.${testCodeFileExt}"
+
+    git rm --cached "${srcdir}/${defaultpkgname}/tests/${defaultpkgname}.test.${testCodeFileExt}"
+
+    git commit -pm"Add ${pkgname}"
+}
+
+checkWorkingTree()
+{
+    ${GIT} update-index --refresh > /dev/null || :
+
+    test x = x"`${GIT} diff-index --name-only HEAD --`" || {
+        echo >&2
+        echo >&2 '    The working tree is dirty.'
+        echo >&2 '    Please stash or deal with modifications to proceed:'
+        echo >&2
+        {
+            ${GIT} diff-index --name-only HEAD -- | ${SED} -e 's,^,        ,'
+        } >&2
+        echo >&2
+
+        return 3
+    }
+}
+
+main ${1+"$@"}
